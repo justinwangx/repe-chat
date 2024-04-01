@@ -1,7 +1,7 @@
-from fastapi.responses import StreamingResponse
+import json
 import requests
 import streamlit as st
-from openai import OpenAI, Stream
+from openai import OpenAI
 
 EMOTION_TO_EMOJI = {
     "happiness": ["😢", "😄"],
@@ -16,6 +16,31 @@ ROLE_TO_EMOJI = {
 }
 
 use_openai = False
+
+def generate_stream(response):
+    buffer = b""
+    for chunk in response.iter_content(chunk_size=8192):
+        buffer += chunk
+        while b"\n\ndata:" in buffer:
+            data, buffer = buffer.split(b"\n\ndata:", 1)
+            try:
+                for json_obj in data.split(b"\n\n"):
+                    if json_obj.strip():
+                        obj = json.loads(json_obj)
+                        if obj.get("choices"):
+                            yield obj["choices"][0]["delta"].get("content", "")
+            except json.JSONDecodeError:
+                continue
+
+    # Handle any remaining data in the buffer
+    try:
+        for json_obj in buffer.split(b"\n\n"):
+            if json_obj.strip():
+                obj = json.loads(json_obj)
+                if obj.get("choices"):
+                    yield obj["choices"][0]["delta"].get("content", "")
+    except json.JSONDecodeError:
+        pass
 
 st.set_page_config(page_title="RepE Chat", page_icon="favicon.ico")
 st.title("RepE Chat 🤯")
@@ -49,7 +74,7 @@ st.write('<hr style="border: 2px solid #e0d8d7;"></hr>', unsafe_allow_html=True)
 
 # Chat Logic
 
-client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"]) if use_openai else None
+client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 
 if "messages" not in st.session_state:
     st.session_state.messages = []
@@ -76,8 +101,7 @@ if prompt := st.chat_input("Say something"):
                 ],
                 stream=True
             )
-            print(type(stream))
-            print(stream)
+            response = st.write_stream(stream)
         else:
             r = requests.post(
                 url=st.secrets["MODEL_ENDPOINT"],
@@ -93,13 +117,6 @@ if prompt := st.chat_input("Say something"):
                     "repe_coefficient": repe_coefficient
                 },
             )
-            r.raise_for_status()
-            stream = StreamingResponse(
-                r.iter_content(chunk_size=8192),
-                status_code=r.status_code,
-                headers=dict(r.headers)
-            )
-
-        response = st.write_stream(stream)
+            response = st.write_stream(generate_stream(r))
 
     st.session_state.messages.append({"role": "assistant", "content": response})
