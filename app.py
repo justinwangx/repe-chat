@@ -18,29 +18,12 @@ ROLE_TO_EMOJI = {
 use_openai = False
 
 def generate_stream(response):
-    buffer = b""
-    for chunk in response.iter_content(chunk_size=8192):
-        buffer += chunk
-        while b"\n\ndata:" in buffer:
-            data, buffer = buffer.split(b"\n\ndata:", 1)
+    for chunk in response.iter_lines():
+        if chunk:
             try:
-                for json_obj in data.split(b"\n\n"):
-                    if json_obj.strip():
-                        obj = json.loads(json_obj)
-                        if obj.get("choices"):
-                            yield obj["choices"][0]["delta"].get("content", "")
-            except json.JSONDecodeError:
+                yield json.loads(chunk.decode().replace("data: ", ""))["choices"][0]["delta"]["content"]
+            except Exception:
                 continue
-
-    # Handle any remaining data in the buffer
-    try:
-        for json_obj in buffer.split(b"\n\n"):
-            if json_obj.strip():
-                obj = json.loads(json_obj)
-                if obj.get("choices"):
-                    yield obj["choices"][0]["delta"].get("content", "")
-    except json.JSONDecodeError:
-        pass
 
 st.set_page_config(page_title="RepE Chat", page_icon="favicon.ico")
 st.title("RepE Chat 🤯")
@@ -50,9 +33,12 @@ with st.sidebar:
     st.write("""
         Chat with a rep-controlled model! 
 
-        ## Contact Us
-        If you have any questions or feedback, please reach out to us at [your contact information].
-    """)
+        You can now stimulate regions in Mistral-7B-Instruct-v0.2's brain while talking to it. 
+        
+        Using [Representation Engineering](%s), we found directions within the model's activation space that correspond to particular emotions. 
+        
+        Without any prompt engineering, we can use these directions at inference-time to control the model's responses!
+    """ % "https://www.ai-transparency.org/")
 
 emotion = st.selectbox(
     "Emotion",
@@ -65,7 +51,7 @@ with col1:
     st.markdown(f'<div style="font-size: 30px;">{EMOTION_TO_EMOJI[emotion.lower()][0]}</div>', unsafe_allow_html=True)
 
 with col2:
-    repe_coefficient = st.slider("RepE coefficient", -5.0, 5.0, value=0.0)
+    repe_coefficient = st.slider("RepE coefficient", -1.5, 1.5, value=0.0)
 
 with col3:
     st.markdown(f'<div style="font-size: 30px; text-align: right;">{EMOTION_TO_EMOJI[emotion.lower()][1]}</div>', unsafe_allow_html=True)
@@ -101,6 +87,7 @@ if prompt := st.chat_input("Say something"):
                 ],
                 stream=True
             )
+
             response = st.write_stream(stream)
         else:
             r = requests.post(
@@ -109,14 +96,16 @@ if prompt := st.chat_input("Say something"):
                 json={
                     "model": "rep-control",
                     "messages": st.session_state.messages,
-                    "stream": True,
                     "n": 1,
                     "echo": False,
                     "logprobs": False,
-                    "control": None,
+                    "stream": True,
+                    "control": emotion.lower(),
                     "repe_coefficient": repe_coefficient
                 },
+                stream=True
             )
+
             response = st.write_stream(generate_stream(r))
 
     st.session_state.messages.append({"role": "assistant", "content": response})
