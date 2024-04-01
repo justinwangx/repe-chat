@@ -1,7 +1,11 @@
 import json
 import requests
 import streamlit as st
-from openai import OpenAI
+
+use_openai = False
+if use_openai:
+    from openai import OpenAI
+    client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 
 EMOTION_TO_EMOJI = {
     "happiness": ["😢", "😄"],
@@ -14,8 +18,6 @@ ROLE_TO_EMOJI = {
     # ideally we'd have a robot emoji here but looks like the `avatar` kwarg isn't supported in st.write_stream
     "assistant": None
 }
-
-use_openai = False
 
 def generate_stream(response):
     for chunk in response.iter_lines():
@@ -59,8 +61,6 @@ with col3:
 st.write('<hr style="border: 2px solid #e0d8d7;"></hr>', unsafe_allow_html=True)
 
 # Chat Logic
-
-client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 
 if "messages" not in st.session_state:
     st.session_state.messages = []
