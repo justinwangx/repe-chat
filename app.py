@@ -8,7 +8,7 @@ if use_openai:
     client = OpenAI(api_key=st.secrets["OPENAI_API_KEY"])
 
 EMOTION_TO_EMOJI = {
-    "happiness": ["😢", "😄"],
+    "happiness": ["😭", "😄"],
     "anger": ["😌", "😡"],
     "surprise": ["😐", "😲"],
     "fear": ["🐱", "🙀"],
