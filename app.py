@@ -10,7 +10,9 @@ if use_openai:
 EMOTION_TO_EMOJI = {
     "happiness": ["😢", "😄"],
     "anger": ["😌", "😡"],
-    "surprise": ["😐", "😲"]
+    "surprise": ["😐", "😲"],
+    "fear": ["🐱", "🙀"],
+    "disgust": ["😻", "🤢"]
 }
 
 ROLE_TO_EMOJI = {
@@ -44,7 +46,7 @@ with st.sidebar:
 
 emotion = st.selectbox(
     "Emotion",
-    ("Happiness", "Anger", "Surprise")
+    ("Happiness", "Anger", "Surprise", "Fear", "Disgust")
 )
 
 col1, col2, col3 = st.columns([1, 8, 1])
